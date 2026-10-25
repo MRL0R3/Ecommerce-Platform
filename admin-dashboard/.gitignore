@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+node_modules/
+build/
+dist/
+
+# Vite
+vite.config.ts
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

@@ -1,0 +1,11 @@
+# =====================================================
+# Pre-built JAR Dockerfile (no Maven inside container)
+# =====================================================
+# Build locally first: mvn -B clean package -DskipTests
+# Then: docker build --build-arg SERVICE=product-service -t ecommerce/product-service -f Dockerfile.service .
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /app
+ARG SERVICE
+COPY ${SERVICE}/target/${SERVICE}-*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]

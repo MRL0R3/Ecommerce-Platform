@@ -1,0 +1,31 @@
+# Shared configuration served by the Config Server.
+# Each service overrides the values it needs in its own application.yml.
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+
+jwt:
+  secret: "ZWNvbW1lcmNlLXBsYXRmb3JtLXN1cGVyLXNlY3JldC1rZXktZm9yLWp3dC1zaWduaW5nLWF0LWxlYXN0LTI1Ni1iaXRz"
+  expiration-ms: 3600000  # 1 hour
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.ecommerce: INFO

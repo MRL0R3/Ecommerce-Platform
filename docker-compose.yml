@@ -1,0 +1,133 @@
+version: "3.9"
+
+# Brings up the entire platform — databases, infrastructure, and services.
+# Pre-requisite: mvn -B clean package -DskipTests
+# Start with:  docker compose up -d
+
+services:
+  # ---------- Databases (one schema per bounded context) ----------
+  postgres:
+    image: postgres:15-alpine
+    container_name: ecommerce-postgres
+    environment:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ecommerce
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------- Infrastructure ----------
+  eureka-server:
+    image: ecommerce/eureka-server:latest
+    container_name: ecommerce-eureka
+    ports:
+      - "8761:8761"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+  config-server:
+    image: ecommerce/config-server:latest
+    container_name: ecommerce-config
+    ports:
+      - "8888:8888"
+    depends_on:
+      - eureka-server
+    environment:
+      - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: ecommerce-zipkin
+    ports:
+      - "9411:9411"
+
+  # ---------- API Gateway ----------
+  api-gateway:
+    image: ecommerce/api-gateway:latest
+    container_name: ecommerce-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - eureka-server
+    environment:
+      - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+  # ---------- Business Services ----------
+  auth-service:
+    image: ecommerce/auth-service:latest
+    container_name: ecommerce-auth
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/auth_db
+      - SPRING_DATASOURCE_USERNAME=ecommerce
+      - SPRING_DATASOURCE_PASSWORD=ecommerce
+      - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+  product-service:
+    image: ecommerce/product-service:latest
+    container_name: ecommerce-product
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/product_db
+      - SPRING_DATASOURCE_USERNAME=ecommerce
+      - SPRING_DATASOURCE_PASSWORD=ecommerce
+      - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+  inventory-service:
+    image: ecommerce/inventory-service:latest
+    container_name: ecommerce-inventory
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/inventory_db
+      - SPRING_DATASOURCE_USERNAME=ecommerce
+      - SPRING_DATASOURCE_PASSWORD=ecommerce
+      - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+  order-service:
+    image: ecommerce/order-service:latest
+    container_name: ecommerce-order
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      inventory-service:
+        condition: service_started
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/order_db
+      - SPRING_DATASOURCE_USERNAME=ecommerce
+      - SPRING_DATASOURCE_PASSWORD=ecommerce
+      - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+
+volumes:
+  postgres_data:

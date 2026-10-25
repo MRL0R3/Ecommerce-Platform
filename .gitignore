@@ -1,0 +1,41 @@
+# Compiled
+target/
+build/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+*.env
+
+# Docker
+docker/data/
+
+# Maven
+.m2/
+
+# H2 Database
+*.h2.db
+*.trace.db
+
+# Temporary files
+/tmp/
+*.pid
+
+# Shell scripts output
+*.sh.log
