@@ -7,7 +7,8 @@ import { Card } from '@/components/Card';
 import { Input } from '@/components/Input';
 import { Table } from '@/components/Table';
 import { InventoryItem, Product, PagedResponse } from '@/types';
-import { Package, AlertTriangle, Plus, Minus, Search, X } from 'lucide-react';
+import { Package, AlertTriangle, Plus, Minus, Search, X, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const InventoryPage = () => {
   const [search, setSearch] = useState('');
@@ -18,6 +19,7 @@ export const InventoryPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [stockChange, setStockChange] = useState<string>('1');
   const [isAdding, setIsAdding] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: inventoryItems = [], refetch: fetchInventory } = useQuery({
     queryKey: ['inventory'],
@@ -54,6 +56,8 @@ export const InventoryPage = () => {
 
   const handleStockUpdate = async () => {
     if (!selectedProduct) return;
+    setIsSubmitting(true);
+    setError('');
     
     try {
       const currentInv = inventoryItems.find(i => i.product.id === selectedProduct.id)?.inventory;
@@ -67,11 +71,16 @@ export const InventoryPage = () => {
         quantity: newQuantity
       });
       
+      toast.success(`Stock updated to ${newQuantity}`);
       setIsModalOpen(false);
       setStockChange('1');
       fetchInventory();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update stock');
+      const msg = err.response?.data?.message || 'Failed to update stock';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -245,11 +254,20 @@ export const InventoryPage = () => {
               />
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+              <Button variant="secondary" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button onClick={handleStockUpdate}>
-                {isAdding ? 'Add Stock' : 'Remove Stock'}
+              <Button onClick={handleStockUpdate} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : isAdding ? (
+                  'Add Stock'
+                ) : (
+                  'Remove Stock'
+                )}
               </Button>
             </div>
           </motion.div>
