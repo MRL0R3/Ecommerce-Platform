@@ -9,7 +9,7 @@ build/
 dist/
 
 # Vite
-vite.config.ts
+dist/
 
 # TypeScript
 *.tsbuildinfo
