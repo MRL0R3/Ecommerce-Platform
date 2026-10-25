@@ -2,17 +2,41 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { orderApi, productApi } from '@/api';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Table } from '@/components/Table';
+import { Input } from '@/components/Input';
 import { Order, Product, PagedResponse } from '@/types';
-import { ShoppingBag, Clock, CheckCircle, XCircle, Truck, Search, Eye, X } from 'lucide-react';
+import { ShoppingBag, Clock, CheckCircle, XCircle, Truck, Search, Eye, X, Plus, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const OrdersPage = () => {
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
+
+  // Create Order Modal state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [orderQuantity, setOrderQuantity] = useState(1);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+
+  // Available products for creating order
+  const { data: availableProducts = [] } = useQuery({
+    queryKey: ['availableProductsForOrder'],
+    queryFn: async () => {
+      try {
+        const res = await productApi.getAll(0, 100);
+        const data = res.data;
+        return (data as PagedResponse<Product>).content || (data as Product[]) || [];
+      } catch {
+        return [];
+      }
+    },
+  });
 
   const { data: { orders = [], products = {} } = {}, error: queryError, refetch: refetchOrders } = useQuery({
     queryKey: ['orders'],
@@ -52,11 +76,50 @@ export const OrdersPage = () => {
     try {
       await orderApi.updateStatus(selectedOrder.id, newStatus);
       setSelectedOrder(prev => prev ? { ...prev, status: newStatus as any } : null);
+      toast.success(`Order status updated to ${newStatus}`);
       refetchOrders();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update order status');
+      toast.error(err.response?.data?.message || 'Failed to update order status');
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProductId) {
+      toast.error('Please select a product');
+      return;
+    }
+    const chosenProduct = availableProducts.find(p => p.id === selectedProductId);
+    if (!chosenProduct) {
+      toast.error('Product not found');
+      return;
+    }
+
+    const customerId = user?.id || '2d827839-dc7d-44ca-94b4-cc1182536651';
+    setIsSubmittingOrder(true);
+    try {
+      await orderApi.create({
+        customerId,
+        items: [
+          {
+            productId: chosenProduct.id,
+            productName: chosenProduct.name,
+            unitPrice: chosenProduct.price,
+            quantity: orderQuantity,
+          },
+        ],
+      });
+      toast.success('Order created successfully and stock reserved!');
+      setIsCreateOpen(false);
+      setSelectedProductId('');
+      setOrderQuantity(1);
+      refetchOrders();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to create order');
+    } finally {
+      setIsSubmittingOrder(false);
     }
   };
 
@@ -113,6 +176,10 @@ export const OrdersPage = () => {
           <h1 className="text-2xl font-bold text-[#1D1D1F]">Orders</h1>
           <p className="text-[#1D1D1F]/60 mt-1">Manage customer orders</p>
         </div>
+        <Button onClick={() => setIsCreateOpen(true)} className="flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          <span>New Order</span>
+        </Button>
       </div>
 
       {/* Search */}
@@ -306,6 +373,116 @@ export const OrdersPage = () => {
             </div>
           </motion.div>
         </>
+      )}
+
+      {/* Create Order Modal */}
+      {isCreateOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setIsCreateOpen(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="w-full max-w-md bg-[#F5F5F7] rounded-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#1D1D1F]">Create New Order</h2>
+              <Button variant="ghost" size="sm" onClick={() => setIsCreateOpen(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <form onSubmit={handleCreateOrder} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#1D1D1F] mb-1.5">
+                  Select Product
+                </label>
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:border-[#0071E3]"
+                  required
+                >
+                  <option value="">-- Choose a product --</option>
+                  {availableProducts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} (${Number(p.price).toFixed(2)}) - {p.sku}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Input
+                  label="Quantity"
+                  type="number"
+                  min={1}
+                  value={orderQuantity}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setOrderQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                  }
+                  required
+                />
+              </div>
+
+              {selectedProductId && (
+                <div className="p-4 bg-white/60 rounded-xl space-y-1.5 border border-gray-200/50">
+                  <div className="flex justify-between text-xs text-[#1D1D1F]/60">
+                    <span>Unit Price:</span>
+                    <span>
+                      $
+                      {Number(
+                        availableProducts.find((p) => p.id === selectedProductId)?.price || 0
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-[#1D1D1F]/60">
+                    <span>Quantity:</span>
+                    <span>x{orderQuantity}</span>
+                  </div>
+                  <div className="border-t border-gray-200 pt-1.5 flex justify-between font-bold text-sm text-[#1D1D1F]">
+                    <span>Total Amount:</span>
+                    <span className="text-[#0071E3]">
+                      $
+                      {(
+                        Number(
+                          availableProducts.find((p) => p.id === selectedProductId)?.price || 0
+                        ) * orderQuantity
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmittingOrder}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmittingOrder || !selectedProductId}>
+                  {isSubmittingOrder ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Place Order'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   );

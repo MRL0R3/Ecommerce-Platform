@@ -5,11 +5,10 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { User } from '@/types';
 import { Users, Shield, Trash2, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const UsersPage = () => {
   const [search, setSearch] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const { data: users = [], refetch: fetchUsers } = useQuery({
     queryKey: ['users'],
@@ -17,7 +16,7 @@ export const UsersPage = () => {
       try {
         const response = await authApi.getUsers();
         return response.data || [];
-      } catch (err: any) {
+      } catch {
         return [];
       }
     },
@@ -28,12 +27,10 @@ export const UsersPage = () => {
     const newRole = user.role === 'ADMIN' ? 'USER' : 'ADMIN';
     try {
       await authApi.updateRole(user.id, newRole);
-      setSuccess(`Role updated to ${newRole} for ${user.username}`);
-      setTimeout(() => setSuccess(''), 3000);
+      toast.success(`Role updated to ${newRole} for ${user.username}`);
       fetchUsers();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update user role');
-      setTimeout(() => setError(''), 3000);
+      toast.error(err.response?.data?.message || 'Failed to update user role');
     }
   };
 
@@ -41,12 +38,10 @@ export const UsersPage = () => {
     if (!window.confirm(`Are you sure you want to delete user ${username}?`)) return;
     try {
       await authApi.deleteUser(id);
-      setSuccess(`User ${username} deleted`);
-      setTimeout(() => setSuccess(''), 3000);
+      toast.success(`User ${username} deleted`);
       fetchUsers();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete user');
-      setTimeout(() => setError(''), 3000);
+      toast.error(err.response?.data?.message || 'Failed to delete user');
     }
   };
 
@@ -70,18 +65,6 @@ export const UsersPage = () => {
           </div>
         </div>
       </div>
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm">
-          {success}
-        </div>
-      )}
 
       {/* Search Bar */}
       <Card className="p-4">

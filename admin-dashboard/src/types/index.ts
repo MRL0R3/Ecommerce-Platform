@@ -104,9 +104,16 @@ export interface Order {
   updatedAt: string;
 }
 
+export interface CreateOrderItemRequest {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+}
+
 export interface CreateOrderRequest {
   customerId: string;
-  items: { productId: string; quantity: number }[];
+  items: CreateOrderItemRequest[];
 }
 
 export interface OrderStats {
