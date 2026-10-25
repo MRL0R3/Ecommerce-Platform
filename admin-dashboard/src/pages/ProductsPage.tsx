@@ -54,12 +54,16 @@ export const ProductsPage = () => {
       const data = response.data;
       const productList = (data as PagedResponse<Product>).content || (data as Product[]) || [];
 
-      // Fetch inventory for all products
+      // Fetch inventory for all products in bulk
       const inventoryMap: Record<string, InventoryItem> = {};
-      for (const product of productList) {
+      if (productList.length > 0) {
         try {
-          const inv = await inventoryApi.getByProductId(product.id);
-          inventoryMap[product.id] = inv.data;
+          const invRes = await inventoryApi.getBulkStock(productList.map((p) => p.id));
+          if (Array.isArray(invRes.data)) {
+            invRes.data.forEach((item) => {
+              inventoryMap[item.productId] = item;
+            });
+          }
         } catch {
           // Product has no inventory yet
         }

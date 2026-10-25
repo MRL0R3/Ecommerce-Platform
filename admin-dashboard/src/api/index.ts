@@ -70,12 +70,12 @@ export const SERVICE_LINKS = {
 // Service health check
 export const checkServiceHealth = async (signal?: AbortSignal): Promise<ServiceHealth[]> => {
   const services = [
-    { name: 'Eureka Server', port: 8761, url: 'http://localhost:8761' },
-    { name: 'API Gateway', port: 8080, url: 'http://localhost:8080' },
-    { name: 'Auth Service', port: 8081, url: 'http://localhost:8081' },
-    { name: 'Product Service', port: 8082, url: 'http://localhost:8082' },
-    { name: 'Inventory Service', port: 8084, url: 'http://localhost:8084' },
-    { name: 'Order Service', port: 8083, url: 'http://localhost:8083' },
+    { name: 'Eureka Server', port: 8761, checkUrl: '/health/eureka', url: 'http://localhost:8761' },
+    { name: 'API Gateway', port: 8080, checkUrl: '/health/gateway', url: 'http://localhost:8080' },
+    { name: 'Auth Service', port: 8081, checkUrl: '/health/auth', url: 'http://localhost:8081' },
+    { name: 'Product Service', port: 8082, checkUrl: '/health/product', url: 'http://localhost:8082' },
+    { name: 'Inventory Service', port: 8084, checkUrl: '/health/inventory', url: 'http://localhost:8084' },
+    { name: 'Order Service', port: 8083, checkUrl: '/health/order', url: 'http://localhost:8083' },
   ];
 
   const results: ServiceHealth[] = [];
@@ -83,9 +83,10 @@ export const checkServiceHealth = async (signal?: AbortSignal): Promise<ServiceH
     signal?.throwIfAborted();
     const start = Date.now();
     try {
-      await axios.get(service.url, { timeout: 2000, signal });
+      const res = await axios.get(service.checkUrl, { timeout: 3000, signal });
+      const isUp = res.status === 200 && (res.data?.status === 'UP' || res.data?.status === undefined);
       results.push({
-        status: 'UP',
+        status: isUp ? 'UP' : 'DOWN',
         responseTime: Date.now() - start,
         service: service.name,
         port: service.port,

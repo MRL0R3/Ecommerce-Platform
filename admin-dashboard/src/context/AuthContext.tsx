@@ -24,14 +24,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
 
   // Check authentication on mount
-  const checkAuth = useCallback(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    } else {
+  const checkAuth = useCallback(async () => {
+    try {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (storedToken) {
+        setToken(storedToken);
+        if (storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch {
+            // ignore JSON parse error
+          }
+        }
+        
+        // Fetch fresh profile from /api/v1/auth/me
+        try {
+          const res = await apiClient.get<User>('/api/v1/auth/me', {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          });
+          if (res.data && res.data.username) {
+            setUser(res.data);
+            localStorage.setItem('user', JSON.stringify(res.data));
+          }
+        } catch {
+          // If token is invalid/expired, it will be handled by response interceptor
+        }
+      } else {
+        setToken(null);
+        setUser(null);
+      }
+    } catch {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       setToken(null);
       setUser(null);
     }
@@ -50,15 +76,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
       });
       
-      const { token, user } = response.data;
+      const { token, role, user: resUser } = response.data;
+      const initialUser: User = resUser || {
+        id: '',
+        username: response.data.username || username,
+        email: '',
+        role: (role as any) || 'USER',
+        createdAt: new Date().toISOString(),
+      };
       
       localStorage.setItem('token', token);
-      if (user) {
-        localStorage.setItem('user', JSON.stringify(user));
-      }
+      localStorage.setItem('user', JSON.stringify(initialUser));
       
       setToken(token);
-      setUser(user || null);
+      setUser(initialUser);
+
+      try {
+        const meRes = await apiClient.get<User>('/api/v1/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (meRes.data && meRes.data.username) {
+          setUser(meRes.data);
+          localStorage.setItem('user', JSON.stringify(meRes.data));
+        }
+      } catch {
+        // Fallback user already set
+      }
     } catch (error: any) {
       throw error;
     }
@@ -73,15 +116,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
       });
       
-      const { token, user } = response.data;
+      const { token, role, user: resUser } = response.data;
+      const initialUser: User = resUser || {
+        id: '',
+        username: response.data.username || username,
+        email: email || '',
+        role: (role as any) || 'USER',
+        createdAt: new Date().toISOString(),
+      };
       
       localStorage.setItem('token', token);
-      if (user) {
-        localStorage.setItem('user', JSON.stringify(user));
-      }
+      localStorage.setItem('user', JSON.stringify(initialUser));
       
       setToken(token);
-      setUser(user || null);
+      setUser(initialUser);
+
+      try {
+        const meRes = await apiClient.get<User>('/api/v1/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (meRes.data && meRes.data.username) {
+          setUser(meRes.data);
+          localStorage.setItem('user', JSON.stringify(meRes.data));
+        }
+      } catch {
+        // Fallback user already set
+      }
     } catch (error: any) {
       throw error;
     }
